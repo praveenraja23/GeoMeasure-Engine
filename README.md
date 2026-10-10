@@ -782,38 +782,6 @@ reasonable *future deployment target*; Compose is the local path).
 
 ---
 
-## Limitations
-
-Honest list of what this project does not do or cannot guarantee:
-
-- **No authentication, authorisation, rate limiting or multi-tenancy.** Anyone who can reach the API can upload and read.
-- Upload size is enforced from `Content-Length` (early 413) and again while streaming to storage, but Starlette parses the multipart body (spooling file parts to a temporary file) *before* the handler runs. A client that sends a chunked body without a length can therefore make the server spool the entire body to temporary storage before it is rejected. Enforce a body-size limit in the reverse proxy as well.
-- One geometry type per Shapefile; KMZ is rejected; only `.zip`/`.kml` are accepted.
-- Mixed GeometryCollections are reported `UNSUPPORTED` rather than split.
-- UTM accuracy degrades away from the zone's central meridian (≈0.2 % at 3°; larger beyond a zone, where the geodesic/equal-area fallback applies). Non-WGS-84 geographic datums are only approximated by WGS 84 when *choosing* a UTM zone.
-- A polygon that GEOS reports valid but is numerically almost degenerate (≈1e-17 deg²) is measured, not rejected.
-- Memory per worker scales with the largest single geometry; `MAX_VERTICES_PER_FEATURE` bounds but does not eliminate this. GDAL/GEOS calls cannot be interrupted mid-call by Celery's soft limit.
-- Trace context is not propagated across the Celery boundary (request IDs are).
-- Antimeridian-crossing `bbox` queries are rejected.
-- Local storage is single-host; the cleanup job must be scheduled externally.
-- The `docker compose` stack and the CI workflow were written carefully but **not executed** by the author's tooling (no Docker daemon available); see below.
-
-### Verification status
-
-| Item | Status |
-| --- | --- |
-| 214 pytest tests | ✅ passed against local PostgreSQL 16 / PostGIS 3.4 / Redis 7, Python 3.12 |
-| Live stack (uvicorn + Celery worker + Redis + PostGIS), `scripts/smoke_test.py` on all 4 sample archives/KML | ✅ passed |
-| Multiprocess worker metrics endpoint | ✅ verified with 2 prefork processes |
-| `ruff`, `ruff format --check`, `mypy .` (strict), `bandit`, `pip-audit` | ✅ clean |
-| Production-only dependency install from `uv.lock` (`--frozen --no-dev`) imports app, worker and cleanup | ✅ verified |
-| `docker build`, `docker compose up` from a clean checkout | ⚠️ **not run** (no Docker in the authoring environment) — files are syntactically valid YAML and mirror the verified non-Docker run |
-| GitHub Actions workflow | ⚠️ **not run** |
-| OpenTelemetry export to a real collector | ⚠️ **not run** |
-| `pre-commit run --all-files` | ⚠️ hooks configured, not executed |
-
----
-
 ## Learning
 
 - A CRS is part of the data, not decoration: the same coordinates mean different things in
